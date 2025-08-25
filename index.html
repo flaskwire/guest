@@ -1,71 +1,24 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <meta charset="UTF-8">
-  <title>Guest Mode Safari Tests 1.0</title>
-  <style>
-    body { font-family: sans-serif; line-height: 1.5; padding: 20px; }
-    a { display: block; margin: 10px 0; font-size: 16px; }
-    pre { background: #f4f4f4; padding: 10px; }
-  </style>
-</head>
-<body>
-  <h1>Guest Mode Safari Test Harness</h1>
-  <p>Click each link or button and observe behavior. Expected: All should be blocked or prompt.</p>
+  <head><title>Guest Mode Escalation Testing</title></head>
+  <body>
+    <h1>Guest Mode Escalation PoC</h1>
+    <a href="sms:+14048607545">SMS</a><br>
+    <a href="tel:+14048607545">Call</a><br>
+    <a href="mailto:test@example.com?subject=hello&body=check">Email</a><br>
+    <a href="facetime:+14048607545">FaceTime</a><br>
+    <a href="maps://?q=Atlanta">Maps</a><br><br>
 
-  <h2>URL Scheme Tests</h2>
-  <a href="tel:+14048607545">tel:// +14048607545</a>
-  <a href="sms:+14048607545">sms:// +14048607545</a>
-  <a href="mailto:test@example.com">mailto:// test@example.com</a>
-  <a href="facetime:+14048607545">facetime:// +14048607545</a>
-  <a href="maps://?q=Atlanta">maps:// search "Atlanta"</a>
-  <a href="itms-services://?action=download-manifest&url=https://example.com/app.plist">
-    itms-services:// (App install manifest)
-  </a>
-  <a href="applepay://">applepay://</a>
-  <a href="airdrop://">airdrop://</a>
-  <a href="x-apple.systempreferences://">x-apple.systempreferences://</a>
+    <input type="file" accept="image/*" capture><br><br>
+    <button onclick="navigator.clipboard.readText().then(t => alert('Clipboard: ' + t))">Read Clipboard</button><br><br>
+    <button onclick="navigator.geolocation.getCurrentPosition(p => alert('Location: ' + p.coords.latitude))">Get Location</button><br><br>
 
-  <h2>Web API Tests</h2>
-  <button onclick="testGeo()">Test Geolocation</button>
-  <button onclick="testMedia()">Test Camera/Microphone</button>
-  <button onclick="testClipboard()">Test Clipboard Read</button>
-
-  <pre id="output"></pre>
-  <form>
-    <input type="file" />
-  </form>
-
-
-  <script>
-    async function testGeo() {
-      navigator.geolocation.getCurrentPosition(
-        pos => log("Geo: SUCCESS " + JSON.stringify(pos.coords)),
-        err => log("Geo: ERROR " + err.message)
-      );
-    }
-
-    async function testMedia() {
-      try {
-        let stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        log("Media: SUCCESS, got stream " + stream.id);
-      } catch (e) {
-        log("Media: ERROR " + e.message);
-      }
-    }
-
-    async function testClipboard() {
-      try {
-        let text = await navigator.clipboard.readText();
-        log("Clipboard: SUCCESS '" + text + "'");
-      } catch (e) {
-        log("Clipboard: ERROR " + e.message);
-      }
-    }
-
-    function log(msg) {
-      document.getElementById("output").textContent += msg + "\n";
-    }
-  </script>
-</body>
+    <video autoplay playsinline></video>
+    <script>
+      navigator.mediaDevices.getUserMedia({ video: true }).then(s => {
+        document.querySelector('video').srcObject = s;
+      });
+    </script>
+  </body>
 </html>
+
