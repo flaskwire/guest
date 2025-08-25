@@ -1,24 +1,167 @@
+
 <!DOCTYPE html>
-<html>
-  <head><title>Guest Mode Escalation Testing</title></head>
-  <body>
-    <h1>Guest Mode Escalation PoC</h1>
-    <a href="sms:+14048607545">SMS</a><br>
-    <a href="tel:+14048607545">Call</a><br>
-    <a href="mailto:test@example.com?subject=hello&body=check">Email</a><br>
-    <a href="facetime:+14048607545">FaceTime</a><br>
-    <a href="maps://?q=Atlanta">Maps</a><br><br>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VisionOS Guest Mode – Safari Privacy/Boundary PoC</title>
+  <style>
+    :root { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji; }
+    body { margin: 0; padding: 16px; line-height: 1.35; }
+    h1 { margin: 0 0 12px; font-size: 20px; }
+    h2 { margin: 24px 0 8px; font-size: 16px; }
+    p, li, button, input, a { font-size: 14px; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    button, .chip {
+      border: 1px solid #ddd; border-radius: 10px; padding: 8px 10px; background: #f7f7f7; cursor: pointer;
+    }
+    button:hover { background: #efefef; }
+    .chip { text-decoration: none; color: inherit; display: inline-block; }
+    .muted { color: #666; }
+    .card { border: 1px solid #e5e5e5; border-radius: 12px; padding: 12px; margin-top: 10px; }
+    pre#log { background: #0b1020; color: #e0e6ff; padding: 12px; border-radius: 8px; height: 260px; overflow: auto; font-size: 12px; }
+    video { width: 100%; max-width: 480px; background: #000; border-radius: 8px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+    .danger { color: #b00020; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>VisionOS Guest Mode – Safari Privacy/Boundary PoC</h1>
+  <p class="muted">One‑tap test bench for clipboard, geolocation, camera (getUserMedia), file capture UI, and URL‑scheme handoffs while only Safari is shared in Guest Mode.</p>
 
-    <input type="file" accept="image/*" capture><br><br>
-    <button onclick="navigator.clipboard.readText().then(t => alert('Clipboard: ' + t))">Read Clipboard</button><br><br>
-    <button onclick="navigator.geolocation.getCurrentPosition(p => alert('Location: ' + p.coords.latitude))">Get Location</button><br><br>
+  <div class="card">
+    <h2>Quick Instructions</h2>
+    <ol>
+      <li>Open this page in <b>Safari on Vision Pro</b> while signed in as the <b>Guest</b>, sharing only Safari.</li>
+      <li>Tap each test below; watch on‑page <b>Log</b> and any system UI (prompts, dialogs, full‑screen capture views).</li>
+      <li>If the camera/file capture UI gets stuck full‑screen, try <b>force‑quitting Safari</b> from the main account.</li>
+    </ol>
+  </div>
 
-    <video autoplay playsinline></video>
-    <script>
-      navigator.mediaDevices.getUserMedia({ video: true }).then(s => {
-        document.querySelector('video').srcObject = s;
-      });
-    </script>
-  </body>
+  <div class="grid">
+    <div class="card">
+      <h2>Test A — Clipboard</h2>
+      <div class="row">
+        <button id="btnClipboard">Read Clipboard (navigator.clipboard.readText)</button>
+        <button id="btnClipboardWrite">Write Clipboard (test string)</button>
+      </div>
+      <p class="muted">Expected: guest should not read main account clipboard without explicit gesture/approval. Watch for only a “Pasted” toast vs actual contents.</p>
+    </div>
+
+    <div class="card">
+      <h2>Test B — Geolocation</h2>
+      <div class="row">
+        <button id="btnGeo">Get Location (getCurrentPosition)</button>
+      </div>
+      <p class="muted">Expected: a prompt or a clear denial. We capture both success and error codes/messages.</p>
+    </div>
+
+    <div class="card">
+      <h2>Test C — Camera (getUserMedia)</h2>
+      <div class="row">
+        <button id="btnCamStart">Start Camera</button>
+        <button id="btnCamStop">Stop Camera</button>
+      </div>
+      <video id="cam" autoplay playsinline muted></video>
+      <p class="muted">Expected: either a prompt, a blocked error, or a working preview. Note if UI overlays appear beyond Safari’s bounds.</p>
+    </div>
+
+    <div class="card">
+      <h2>Test D — File Capture UI</h2>
+      <div class="row">
+        <input id="fileInput" type="file" accept="image/*" capture>
+        <button id="btnOpenFile">Open File Picker</button>
+      </div>
+      <p class="muted">Expected: a bounded picker or a denial. <span class="danger">If full‑screen camera UI persists across accounts, capture details — this may be a boundary violation/DoS.</span></p>
+    </div>
+
+    <div class="card">
+      <h2>Test E — URL‑Scheme Handoffs</h2>
+      <div class="row">
+        <a class="chip" href="tel:+14048607545">tel:// (Call)</a>
+        <a class="chip" href="sms:+14048607545">sms:// (Messages)</a>
+        <a class="chip" href="mailto:test@example.com?subject=hello&body=check">mailto:// (Mail)</a>
+        <a class="chip" href="facetime:+14048607545">facetime://</a>
+        <a class="chip" href="maps://?q=Atlanta">maps://</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Debug Log</h2>
+    <pre id="log">Ready…</pre>
+  </div>
+
+  <iframe id="hiddenFrame" style="display:none;"></iframe>
+
+  <script>
+    const log = (msg) => {
+      const out = document.getElementById("log");
+      out.textContent += "\n" + msg;
+      out.scrollTop = out.scrollHeight;
+    };
+
+    document.getElementById("btnClipboard").onclick = async () => {
+      try {
+        const txt = await navigator.clipboard.readText();
+        log("[Clipboard] Read: " + txt);
+      } catch (err) {
+        log("[Clipboard] Error: " + err.message);
+      }
+    };
+
+    document.getElementById("btnClipboardWrite").onclick = async () => {
+      try {
+        await navigator.clipboard.writeText("Test string from PoC");
+        log("[Clipboard] Write success.");
+      } catch (err) {
+        log("[Clipboard] Write failed: " + err.message);
+      }
+    };
+
+    document.getElementById("btnGeo").onclick = () => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          log("[Geolocation] Lat: " + pos.coords.latitude + ", Lon: " + pos.coords.longitude);
+        },
+        (err) => {
+          log("[Geolocation] Error: " + err.message);
+        }
+      );
+    };
+
+    let camStream;
+    document.getElementById("btnCamStart").onclick = async () => {
+      try {
+        camStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        document.getElementById("cam").srcObject = camStream;
+        log("[Camera] Started successfully.");
+      } catch (err) {
+        log("[Camera] Error: " + err.message);
+      }
+    };
+
+    document.getElementById("btnCamStop").onclick = () => {
+      if (camStream) {
+        camStream.getTracks().forEach(track => track.stop());
+        document.getElementById("cam").srcObject = null;
+        log("[Camera] Stopped.");
+      }
+    };
+
+    document.getElementById("btnOpenFile").onclick = () => {
+      document.getElementById("fileInput").click();
+    };
+
+    document.getElementById("fileInput").onchange = (e) => {
+      if (e.target.files.length > 0) {
+        log("[File Picker] Selected: " + e.target.files[0].name);
+      } else {
+        log("[File Picker] Cancelled or empty.");
+      }
+    };
+  </script>
+</body>
 </html>
+
 
